@@ -3,6 +3,19 @@ import json
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# Rich imports for beautiful terminal UI
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
+from rich.live import Live
+from rich.spinner import Spinner
+from rich.columns import Columns
+from rich.align import Align
+from rich.table import Table
+from rich.markdown import Markdown
+from rich.progress import Progress, SpinnerColumn, TextColumn
+import time
+
 # Import the packages of 3 tools we have just created 
 import src.tools.check_weather.weather_checking as check_weather
 from src.tools.image_crawler.ImageCrawler import AutoCrawler
@@ -11,6 +24,9 @@ import src.tools.my_calculator.calculator as calculator
 # Load the API key getting from openrouter
 load_dotenv()
 openai_api_key = os.getenv("OPENROUTER_API_KEY")
+
+# Initialize Rich console
+console = Console()
 
 class IntelligentChatbot:
     def __init__(self):
@@ -83,20 +99,22 @@ Chat examples:
 """
 
         try:
-            response = self.client.chat.completions.create(
-                model="qwen/qwen2.5-vl-32b-instruct:free",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                temperature=0.1
-            )
+            # Show thinking spinner
+            with console.status("[bold green]🤔 Thinking...", spinner="dots"):
+                response = self.client.chat.completions.create(
+                    model="qwen/qwen2.5-vl-32b-instruct:free",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message}
+                    ],
+                    temperature=0.1
+                )
             
             analysis = response.choices[0].message.content.strip()
             return json.loads(analysis)
             
         except Exception as e:
-            print(f"Error in analysis: {e}")
+            console.print(f"[red]Error in analysis: {e}[/red]")
             return {"action": "chat", "response": "Sorry, I had trouble understanding that. Could you try again?"}
     
     def execute_tool(self, tool, params):
@@ -104,36 +122,54 @@ Chat examples:
         
         try:
             if tool == "calculator":
-                result = calculator.calculator_tool(params["expression"])
+                with console.status(f"[bold blue]🧮 Calculating {params['expression']}...", spinner="dots"):
+                    result = calculator.calculator_tool(params["expression"])
+                
                 if result["error"]:
                     return f"Sorry, I couldn't calculate that: {result['error']}"
                 else:
                     return f"The answer is: {result['result']}"
             
             elif tool == "weather":
-                result = check_weather.get_weather_info(params["location"])
+                with console.status(f"[bold cyan]🌤️ Getting weather for {params['location']}...", spinner="weather"):
+                    result = check_weather.get_weather_info(params["location"])
+                
                 if "error" in result:
                     return f"Sorry, I couldn't get weather info: {result['error']}"
                 else:
-                    return (f"Weather in {result['location']}, {result['country']}:\n"
-                           f"🌡️ Temperature: {result['temperature']}°C (feels like {result['feels_like']}°C)\n"
-                           f"☁️ Conditions: {result['description']}\n"
-                           f"💧 Humidity: {result['humidity']}%\n"
-                           f"🌬️ Wind: {result['wind_speed']} km/h\n"
-                           f"👁️ Visibility: {result['visibility']} km")
+                    # Create a beautiful weather table
+                    weather_table = Table(show_header=False, box=None, padding=(0, 1))
+                    weather_table.add_column("Icon", style="bold")
+                    weather_table.add_column("Info", style="")
+                    
+                    weather_table.add_row("🌍", f"[bold]{result['location']}, {result['country']}[/bold]")
+                    weather_table.add_row("🌡️", f"Temperature: [bold cyan]{result['temperature']}°C[/bold cyan] (feels like {result['feels_like']}°C)")
+                    weather_table.add_row("☁️", f"Conditions: [bold yellow]{result['description']}[/bold yellow]")
+                    weather_table.add_row("💧", f"Humidity: [bold blue]{result['humidity']}%[/bold blue]")
+                    weather_table.add_row("🌬️", f"Wind: [bold green]{result['wind_speed']} km/h[/bold green]")
+                    weather_table.add_row("👁️", f"Visibility: [bold magenta]{result['visibility']} km[/bold magenta]")
+                    
+                    return weather_table
             
             elif tool == "images":
                 keyword = params["keyword"]
                 count = params.get("count", 5)
                 
-                success = self.image_crawler.download_keyword_images(keyword, count)
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    console=console
+                ) as progress:
+                    task = progress.add_task(f"🖼️ Downloading {count} images of '{keyword}'...", total=None)
+                    success = self.image_crawler.download_keyword_images(keyword, count)
+                
                 if success:
-                    return f"Successfully downloaded {count} images of '{keyword}'! Check the 'downloaded_images/{keyword}/' folder."
+                    return f"✅ Successfully downloaded [bold green]{count}[/bold green] images of '[bold cyan]{keyword}[/bold cyan]'! Check the 'downloaded_images/{keyword}/' folder."
                 else:
-                    return f"Sorry, I couldn't download images of '{keyword}' right now."
+                    return f"❌ Sorry, I couldn't download images of '{keyword}' right now."
         
         except Exception as e:
-            return f"Sorry, I'm currently unavailable for this request."
+            return f"❌ Sorry, I'm currently unavailable for this request."
     
     def generate_response(self, user_message, tool_result=None):
         """Step 2: Generate natural response, optionally including tool results"""
@@ -146,14 +182,15 @@ Chat examples:
             system_prompt = "You are a friendly chatbot. Respond naturally and conversationally to the user's message."
         
         try:
-            response = self.client.chat.completions.create(
-                model="qwen/qwen2.5-vl-32b-instruct:free",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": context}
-                ],
-                temperature=0.7
-            )
+            with console.status("[bold green]✨ Generating response...", spinner="dots"):
+                response = self.client.chat.completions.create(
+                    model="qwen/qwen2.5-vl-32b-instruct:free",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": context}
+                    ],
+                    temperature=0.7
+                )
             
             return response.choices[0].message.content
             
@@ -173,26 +210,30 @@ Chat examples:
         if analysis["action"] == "use_tool":
             # Execute tool directly
             tool_result = self.execute_tool(analysis["tool"], analysis["params"])
-            response = self.generate_response(user_message, tool_result)
+            
+            # If tool_result is a Table (weather), display it directly
+            if hasattr(tool_result, 'add_row'):
+                return tool_result
+            else:
+                response = self.generate_response(user_message, tool_result)
+                return response
             
         elif analysis["action"] == "suggest_tool":
             # Suggest using a tool
             response = analysis["suggestion"]
             self.pending_action = {"tool": analysis["tool"], "keyword": self.extract_keyword_from_message(user_message)}
+            return response
             
         elif analysis["action"] == "ask_clarification":
             # Ask for missing information
             response = analysis["question"]
             self.pending_action = {"tool": analysis["tool"], "waiting_for": "clarification"}
+            return response
             
         else:
             # Normal chat
             response = analysis["response"]
-        
-        # Add response to history
-        self.conversation_history.append({"role": "assistant", "content": response})
-        
-        return response
+            return response
     
     def handle_pending_action(self, user_response):
         """Handle responses to tool suggestions or clarification requests"""
@@ -225,7 +266,7 @@ Chat examples:
             if pending["tool"] == "weather":
                 # User provided city name
                 tool_result = self.execute_tool("weather", {"location": user_response})
-                return self.generate_response(f"weather in {user_response}", tool_result)
+                return tool_result  # Return the table directly
             
             elif pending["tool"] == "images":
                 # This could be keyword or count - analyze the response
@@ -242,90 +283,86 @@ Chat examples:
         common_words = {"i", "love", "like", "hate", "the", "a", "an", "and", "or", "but", "is", "are", "was", "were"}
         keywords = [word for word in words if word not in common_words and len(word) > 2]
         return keywords[-1] if keywords else "images"
+
+def display_startup_banner():
+    """Display a beautiful startup banner"""
+    console.clear()
     
-    def print_user_message(self, message):
-        """Print user message with nice formatting"""
-        terminal_width = 80
-        print("\n" + "="*terminal_width)
-        print(f"👤 USER:")
-        print("-" * terminal_width)
-        # Wrap long messages
-        words = message.split()
-        line = ""
-        for word in words:
-            if len(line + word + " ") <= terminal_width - 4:
-                line += word + " "
-            else:
-                if line:
-                    print(f"   {line.strip()}")
-                line = word + " "
-        if line:
-            print(f"   {line.strip()}")
-        print("="*terminal_width)
+    # Create title
+    title = Text("🤖 INTELLIGENT CHATBOT", style="bold magenta", justify="center")
     
-    def print_bot_response(self, response):
-        """Print chatbot response with nice formatting"""
-        terminal_width = 80
-        print(f"\n🤖 CHATBOT:")
-        print("-" * terminal_width)
-        
-        # Handle multi-line responses (like weather info)
-        lines = response.split('\n')
-        for line in lines:
-            if not line.strip():
-                print()
-                continue
-            
-            # Wrap long lines
-            words = line.split()
-            current_line = ""
-            for word in words:
-                if len(current_line + word + " ") <= terminal_width - 4:
-                    current_line += word + " "
-                else:
-                    if current_line:
-                        print(f"   {current_line.strip()}")
-                    current_line = word + " "
-            if current_line:
-                print(f"   {current_line.strip()}")
-        
-        print("-" * terminal_width)
-        print()
+    # Create features table
+    features_table = Table(show_header=False, box=None, padding=(0, 2))
+    features_table.add_column("Icon", style="bold", width=4)
+    features_table.add_column("Feature", style="cyan")
+    
+    features_table.add_row("🧮", "Mathematical calculations")
+    features_table.add_row("🌤️", "Weather information")
+    features_table.add_row("🖼️", "Image downloading from Google")
+    
+    # Create help text
+    help_text = Text("Commands: Type 'quit', 'exit', or 'bye' to end the conversation", 
+                    style="dim italic", justify="center")
+    
+    # Display everything in panels
+    console.print(Panel(title, style="bold blue", padding=(1, 2)))
+    console.print(Panel(features_table, title="✨ Available Tools", 
+                       title_align="left", style="green", padding=(1, 2)))
+    console.print(Panel(help_text, style="yellow", padding=(0, 2)))
+
+def display_user_message(message):
+    """Display user message with beautiful formatting"""
+    user_text = Text(message, style="bold white")
+    console.print(Panel(user_text, title="👤 You", title_align="left", 
+                       style="blue", padding=(0, 1)))
+
+def display_bot_response(response):
+    """Display chatbot response with beautiful formatting"""
+    # If response is a Table (weather), display it in a panel
+    if hasattr(response, 'add_row'):
+        console.print(Panel(response, title="🤖 Chatbot", title_align="left", 
+                           style="green", padding=(1, 2)))
+    else:
+        # For text responses, check if it contains markdown-like formatting
+        if any(marker in str(response) for marker in ['**', '*', '_', '`', '#']):
+            # Render as markdown
+            md_response = Markdown(str(response))
+            console.print(Panel(md_response, title="🤖 Chatbot", title_align="left", 
+                               style="green", padding=(1, 2)))
+        else:
+            # Regular text with rich formatting
+            bot_text = Text(str(response))
+            console.print(Panel(bot_text, title="🤖 Chatbot", title_align="left", 
+                               style="green", padding=(1, 2)))
+
+def get_user_input():
+    """Get user input with a beautiful prompt"""
+    console.print("\n💬", style="bold cyan", end=" ")
+    return console.input("[bold cyan]Type your message:[/bold cyan] ")
 
 def main():
     """Main function to run the chatbot"""
     
-    # Print startup banner
-    print("\n" + "="*80)
-    print("🤖 INTELLIGENT CHATBOT")
-    print("="*80)
-    print("   Welcome! I can help you with:")
-    print("   📊 Mathematical calculations")
-    print("   🌤️  Weather information")
-    print("   🖼️  Downloading images from Google")
-    print("="*80)
-    print("   Commands: Type 'quit', 'exit', or 'bye' to end the conversation")
-    print("="*80)
+    # Display startup banner
+    display_startup_banner()
     
     chatbot = IntelligentChatbot()
     
     while True:
         try:
-            # Get user input with custom prompt
-            print("\n💬 Type your message:")
-            user_input = input("➤ ").strip()
+            # Get user input
+            user_input = get_user_input().strip()
             
             if user_input.lower() in ['quit', 'exit', 'bye']:
-                print("\n" + "="*80)
-                print("🤖 CHATBOT: Goodbye! Have a great day! 👋")
-                print("="*80)
+                goodbye_text = Text("Goodbye! Have a great day! 👋", style="bold magenta", justify="center")
+                console.print(Panel(goodbye_text, style="yellow", padding=(1, 2)))
                 break
             
             if not user_input:
                 continue
             
-            # Display user message with formatting
-            chatbot.print_user_message(user_input)
+            # Display user message
+            display_user_message(user_input)
             
             # Get and display bot response
             if chatbot.pending_action:
@@ -333,15 +370,17 @@ def main():
             else:
                 response = chatbot.chat(user_input)
             
-            chatbot.print_bot_response(response)
+            display_bot_response(response)
             
         except KeyboardInterrupt:
-            print("\n\n" + "="*80)
-            print("🤖 CHATBOT: Goodbye! Have a great day! 👋")
-            print("="*80)
+            console.print("\n")
+            goodbye_text = Text("Goodbye! Have a great day! 👋", style="bold magenta", justify="center")
+            console.print(Panel(goodbye_text, style="yellow", padding=(1, 2)))
             break
         except Exception as e:
-            print("\n🤖 CHATBOT: Sorry, I encountered an error. Let's try again!")
+            error_text = Text("Sorry, I encountered an error. Let's try again!", style="bold red")
+            console.print(Panel(error_text, title="⚠️ Error", title_align="left", 
+                               style="red", padding=(0, 1)))
 
 if __name__ == "__main__":
     main()

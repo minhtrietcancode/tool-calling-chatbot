@@ -9,6 +9,7 @@ dependencies = [
     "pillow>=11.3.0",
     "python-dotenv>=1.1.1",
     "requests>=2.32.4",
+    "rich>=14.1.0",
     "selenium>=4.34.2",
     "webdriver-manager>=4.0.2",
 ]
