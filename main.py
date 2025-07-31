@@ -33,14 +33,22 @@ class IntelligentChatbot:
         
         system_prompt = """You are an intelligent assistant that can use 3 tools:
 
-1. CALCULATOR: For math calculations - can handle expressions like "2 + 3", "898 * 902", etc.
+1. CALCULATOR: For math calculations - you MUST convert natural language math questions into proper mathematical expressions
 2. WEATHER: For weather information - needs a city name
 3. IMAGE_DOWNLOADER: For downloading images from Google - needs a keyword and count
+
+IMPORTANT FOR CALCULATOR: When users ask math questions in natural language, you MUST convert them to proper mathematical expressions:
+- "989 times with 9909" → "989 * 9909"
+- "what is 50 plus 25" → "50 + 25"
+- "divide 100 by 4" → "100 / 4"
+- "5 to the power of 3" → "5 ** 3"
+- "square root of 16" → "16 ** 0.5"
+- "what's 15 minus 8" → "15 - 8"
 
 Your job is to analyze the user's message and decide what to do. Respond with ONLY a JSON object:
 
 For direct tool use (when user clearly wants calculation/weather/images):
-{"action": "use_tool", "tool": "calculator", "params": {"expression": "898 * 902"}}
+{"action": "use_tool", "tool": "calculator", "params": {"expression": "989 * 9909"}}
 {"action": "use_tool", "tool": "weather", "params": {"location": "Melbourne"}}
 {"action": "use_tool", "tool": "images", "params": {"keyword": "cats", "count": 5}}
 
@@ -54,14 +62,24 @@ For asking clarification (when tool info is missing):
 For normal chat (no tools needed):
 {"action": "chat", "response": "Your normal conversational response here"}
 
-Examples:
-- "What's 5 + 3?" → use calculator directly
+Math question examples:
+- "What's 5 + 3?" → {"action": "use_tool", "tool": "calculator", "params": {"expression": "5 + 3"}}
+- "989 times with 9909" → {"action": "use_tool", "tool": "calculator", "params": {"expression": "989 * 9909"}}
+- "What is the result of 50 divided by 2?" → {"action": "use_tool", "tool": "calculator", "params": {"expression": "50 / 2"}}
+- "Calculate 15 plus 25 minus 10" → {"action": "use_tool", "tool": "calculator", "params": {"expression": "15 + 25 - 10"}}
+
+Weather examples:
 - "Weather in Tokyo" → use weather directly  
+- "What's the weather?" → ask for city
+
+Image examples:
 - "Download 10 cat images" → use images directly
 - "I love dogs" → suggest images
-- "What's the weather?" → ask for city
 - "Download some pictures" → ask for keyword and count
+
+Chat examples:
 - "How are you?" → normal chat
+- "Tell me a joke" → normal chat
 """
 
         try:
