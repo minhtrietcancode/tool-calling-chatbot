@@ -2,16 +2,14 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# Import the packages of 3 tools we have just created 
+import src.tools.check_weather.weather_checking as check_weather
+from src.tools.image_crawler.ImageCrawler import AutoCrawler
+import src.tools.my_calculator.calculator as calculator 
+
+# Load the API key for openrouter and weather api 
 load_dotenv()
+openai_api_key = os.getenv("OPENROUTER_API_KEY")
+weather_api_key = os.getenv("WEATHER_API_KEY")
 
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY")
-)
 
-response = client.chat.completions.create(
-    model="qwen/qwen3-coder:free",  # Free Qwen3 Coder model
-    messages=[{"role": "user", "content": "Hello, this is a test!"}]
-)
-
-print(response.choices[0].message.content)
