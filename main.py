@@ -242,40 +242,106 @@ Chat examples:
         common_words = {"i", "love", "like", "hate", "the", "a", "an", "and", "or", "but", "is", "are", "was", "were"}
         keywords = [word for word in words if word not in common_words and len(word) > 2]
         return keywords[-1] if keywords else "images"
+    
+    def print_user_message(self, message):
+        """Print user message with nice formatting"""
+        terminal_width = 80
+        print("\n" + "="*terminal_width)
+        print(f"👤 USER:")
+        print("-" * terminal_width)
+        # Wrap long messages
+        words = message.split()
+        line = ""
+        for word in words:
+            if len(line + word + " ") <= terminal_width - 4:
+                line += word + " "
+            else:
+                if line:
+                    print(f"   {line.strip()}")
+                line = word + " "
+        if line:
+            print(f"   {line.strip()}")
+        print("="*terminal_width)
+    
+    def print_bot_response(self, response):
+        """Print chatbot response with nice formatting"""
+        terminal_width = 80
+        print(f"\n🤖 CHATBOT:")
+        print("-" * terminal_width)
+        
+        # Handle multi-line responses (like weather info)
+        lines = response.split('\n')
+        for line in lines:
+            if not line.strip():
+                print()
+                continue
+            
+            # Wrap long lines
+            words = line.split()
+            current_line = ""
+            for word in words:
+                if len(current_line + word + " ") <= terminal_width - 4:
+                    current_line += word + " "
+                else:
+                    if current_line:
+                        print(f"   {current_line.strip()}")
+                    current_line = word + " "
+            if current_line:
+                print(f"   {current_line.strip()}")
+        
+        print("-" * terminal_width)
+        print()
 
 def main():
     """Main function to run the chatbot"""
     
-    print("🤖 Intelligent Chatbot Started!")
-    print("I can help you with calculations, weather info, and downloading images!")
-    print("Type 'quit' to exit.\n")
+    # Print startup banner
+    print("\n" + "="*80)
+    print("🤖 INTELLIGENT CHATBOT")
+    print("="*80)
+    print("   Welcome! I can help you with:")
+    print("   📊 Mathematical calculations")
+    print("   🌤️  Weather information")
+    print("   🖼️  Downloading images from Google")
+    print("="*80)
+    print("   Commands: Type 'quit', 'exit', or 'bye' to end the conversation")
+    print("="*80)
     
     chatbot = IntelligentChatbot()
     
     while True:
         try:
-            user_input = input("You: ").strip()
+            # Get user input with custom prompt
+            print("\n💬 Type your message:")
+            user_input = input("➤ ").strip()
             
             if user_input.lower() in ['quit', 'exit', 'bye']:
-                print("Chatbot: Goodbye! Have a great day! 👋")
+                print("\n" + "="*80)
+                print("🤖 CHATBOT: Goodbye! Have a great day! 👋")
+                print("="*80)
                 break
             
             if not user_input:
                 continue
             
-            # Check if we have a pending action
+            # Display user message with formatting
+            chatbot.print_user_message(user_input)
+            
+            # Get and display bot response
             if chatbot.pending_action:
                 response = chatbot.handle_pending_action(user_input)
             else:
                 response = chatbot.chat(user_input)
             
-            print(f"Chatbot: {response}\n")
+            chatbot.print_bot_response(response)
             
         except KeyboardInterrupt:
-            print("\nChatbot: Goodbye! Have a great day! 👋")
+            print("\n\n" + "="*80)
+            print("🤖 CHATBOT: Goodbye! Have a great day! 👋")
+            print("="*80)
             break
         except Exception as e:
-            print(f"Chatbot: Sorry, I encountered an error. Let's try again!")
+            print("\n🤖 CHATBOT: Sorry, I encountered an error. Let's try again!")
 
 if __name__ == "__main__":
     main()
