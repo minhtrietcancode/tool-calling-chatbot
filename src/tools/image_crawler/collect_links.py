@@ -135,41 +135,6 @@ class CollectLinks:
 
         return links
 
-    def naver(self, keyword, add_url=""):
-        self.browser.get(
-            "https://search.naver.com/search.naver?where=image&sm=tab_jum&query={}{}".format(keyword, add_url))
-
-        time.sleep(1)
-
-        print('Scrolling down')
-
-        elem = self.browser.find_element(By.TAG_NAME, "body")
-
-        for i in range(60):
-            elem.send_keys(Keys.PAGE_DOWN)
-            time.sleep(0.2)
-
-        imgs = self.browser.find_elements(By.XPATH, '//div[@class="tile_item _fe_image_tab_content_tile"]//img[@class="_fe_image_tab_content_thumbnail_image"]')
-
-        print('Scraping links')
-
-        links = []
-
-        for img in imgs:
-            try:
-                src = img.get_attribute("src")
-                if src[0] != 'd':
-                    links.append(src)
-            except Exception as e:
-                print('[Exception occurred while collecting links from naver] {}'.format(e))
-
-        links = self.remove_duplicates(links)
-
-        print('Collect links done. Site: {}, Keyword: {}, Total: {}'.format('naver', keyword, len(links)))
-        self.browser.close()
-
-        return links
-
     def google_full(self, keyword, add_url="", limit=100):
         print('[Full Resolution Mode]')
 
@@ -243,68 +208,8 @@ class CollectLinks:
 
         return links
 
-    def naver_full(self, keyword, add_url=""):
-        print('[Full Resolution Mode]')
-
-        self.browser.get(
-            "https://search.naver.com/search.naver?where=image&sm=tab_jum&query={}{}".format(keyword, add_url))
-        time.sleep(1)
-
-        elem = self.browser.find_element(By.TAG_NAME, "body")
-
-        print('Scraping links')
-
-        # Click the first image
-        self.wait_and_click('//div[@class="tile_item _fe_image_tab_content_tile"]//img[@class="_fe_image_tab_content_thumbnail_image"]')
-        time.sleep(1)
-
-        links = []
-        count = 1
-
-        last_scroll = 0
-        scroll_patience = 0
-
-        while True:
-            try:
-                xpath = '//img[@class="_fe_image_viewer_image_fallback_target"]'
-                imgs = self.browser.find_elements(By.XPATH, xpath)
-
-                for img in imgs:
-                    self.highlight(img)
-                    src = img.get_attribute('src')
-
-                    if src not in links and src is not None:
-                        links.append(src)
-                        print('%d: %s' % (count, src))
-                        count += 1
-
-            except StaleElementReferenceException:
-                # print('[Expected Exception - StaleElementReferenceException]')
-                pass
-            except Exception as e:
-                print('[Exception occurred while collecting links from naver_full] {}'.format(e))
-
-            scroll = self.get_scroll()
-            if scroll == last_scroll:
-                scroll_patience += 1
-            else:
-                scroll_patience = 0
-                last_scroll = scroll
-
-            if scroll_patience >= 100:
-                break
-
-            elem.send_keys(Keys.RIGHT)
-
-        links = self.remove_duplicates(links)
-
-        print('Collect links done. Site: {}, Keyword: {}, Total: {}'.format('naver_full', keyword, len(links)))
-        self.browser.close()
-
-        return links
-
 
 if __name__ == '__main__':
     collect = CollectLinks()
-    links = collect.naver_full('박보영')
+    links = collect.google_full('박보영')
     print(len(links), links)
