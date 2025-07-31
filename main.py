@@ -14,6 +14,8 @@ from rich.align import Align
 from rich.table import Table
 from rich.markdown import Markdown
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.rule import Rule
+from rich.box import ROUNDED, HEAVY, DOUBLE
 import time
 
 # Import the packages of 3 tools we have just created 
@@ -43,6 +45,95 @@ class IntelligentChatbot:
             full_resolution=False,
             no_gui=True
         )
+    
+    def display_tool_activation(self, tool_name, params):
+        """Display a special indicator when a tool is being activated"""
+        tool_configs = {
+            "calculator": {
+                "icon": "🧮",
+                "name": "CALCULATOR TOOL",
+                "color": "bright_blue",
+                "style": "bold bright_blue",
+                "box": HEAVY
+            },
+            "weather": {
+                "icon": "🌤️",
+                "name": "WEATHER TOOL", 
+                "color": "bright_cyan",
+                "style": "bold bright_cyan",
+                "box": DOUBLE
+            },
+            "images": {
+                "icon": "🖼️",
+                "name": "IMAGE DOWNLOADER TOOL",
+                "color": "bright_magenta", 
+                "style": "bold bright_magenta",
+                "box": ROUNDED
+            }
+        }
+        
+        config = tool_configs.get(tool_name, tool_configs["calculator"])
+        
+        # Create tool activation banner
+        tool_text = Text(f"{config['icon']} {config['name']} ACTIVATED", 
+                        style=config['style'], justify="center")
+        
+        # Create parameters display
+        param_text = ""
+        if tool_name == "calculator":
+            param_text = f"Expression: {params.get('expression', 'N/A')}"
+        elif tool_name == "weather":
+            param_text = f"Location: {params.get('location', 'N/A')}"
+        elif tool_name == "images":
+            param_text = f"Keyword: {params.get('keyword', 'N/A')}, Count: {params.get('count', 5)}"
+        
+        params_display = Text(param_text, style="italic", justify="center")
+        
+        # Display the activation banner
+        console.print(Rule(style=config['color']))
+        console.print(Panel(
+            Text.assemble(tool_text, "\n", params_display),
+            style=config['color'],
+            box=config['box'],
+            padding=(1, 2)
+        ))
+        console.print(Rule(style=config['color']))
+    
+    def display_tool_result(self, tool_name, result, success=True):
+        """Display tool execution result with special formatting"""
+        tool_configs = {
+            "calculator": {"icon": "🧮", "color": "bright_blue"},
+            "weather": {"icon": "🌤️", "color": "bright_cyan"}, 
+            "images": {"icon": "🖼️", "color": "bright_magenta"}
+        }
+        
+        config = tool_configs.get(tool_name, tool_configs["calculator"])
+        
+        if success:
+            status_icon = "✅"
+            status_text = "COMPLETED SUCCESSFULLY"
+            border_style = f"bold {config['color']}"
+        else:
+            status_icon = "❌"
+            status_text = "EXECUTION FAILED"
+            border_style = "bold red"
+        
+        # For weather results that are tables, handle them specially
+        if hasattr(result, 'add_row'):
+            header = Text(f"{config['icon']} {status_icon} TOOL RESULT: {status_text}", 
+                         style=border_style, justify="center")
+            console.print(Panel(header, style=border_style, box=DOUBLE))
+            console.print(Panel(result, title=f"{config['icon']} Weather Information", 
+                               title_align="left", style=config['color'], padding=(1, 2)))
+        else:
+            # For text results
+            result_display = Text.assemble(
+                Text(f"{config['icon']} {status_icon} TOOL RESULT: {status_text}", 
+                     style=border_style, justify="center"),
+                "\n\n",
+                Text(str(result), style="white")
+            )
+            console.print(Panel(result_display, style=border_style, box=DOUBLE, padding=(1, 2)))
     
     def analyze_message(self, user_message):
         """Step 1: Analyze user message and decide what action to take"""
@@ -120,22 +211,31 @@ Chat examples:
     def execute_tool(self, tool, params):
         """Execute the specified tool with given parameters"""
         
+        # Display tool activation indicator
+        self.display_tool_activation(tool, params)
+        
         try:
             if tool == "calculator":
                 with console.status(f"[bold blue]🧮 Calculating {params['expression']}...", spinner="dots"):
                     result = calculator.calculator_tool(params["expression"])
                 
                 if result["error"]:
-                    return f"Sorry, I couldn't calculate that: {result['error']}"
+                    error_msg = f"Sorry, I couldn't calculate that: {result['error']}"
+                    self.display_tool_result(tool, error_msg, success=False)
+                    return error_msg
                 else:
-                    return f"The answer is: {result['result']}"
+                    success_msg = f"The answer is: {result['result']}"
+                    self.display_tool_result(tool, success_msg, success=True)
+                    return success_msg
             
             elif tool == "weather":
                 with console.status(f"[bold cyan]🌤️ Getting weather for {params['location']}...", spinner="weather"):
                     result = check_weather.get_weather_info(params["location"])
                 
                 if "error" in result:
-                    return f"Sorry, I couldn't get weather info: {result['error']}"
+                    error_msg = f"Sorry, I couldn't get weather info: {result['error']}"
+                    self.display_tool_result(tool, error_msg, success=False)
+                    return error_msg
                 else:
                     # Create a beautiful weather table
                     weather_table = Table(show_header=False, box=None, padding=(0, 1))
@@ -149,6 +249,7 @@ Chat examples:
                     weather_table.add_row("🌬️", f"Wind: [bold green]{result['wind_speed']} km/h[/bold green]")
                     weather_table.add_row("👁️", f"Visibility: [bold magenta]{result['visibility']} km[/bold magenta]")
                     
+                    self.display_tool_result(tool, weather_table, success=True)
                     return weather_table
             
             elif tool == "images":
@@ -164,12 +265,18 @@ Chat examples:
                     success = self.image_crawler.download_keyword_images(keyword, count)
                 
                 if success:
-                    return f"✅ Successfully downloaded [bold green]{count}[/bold green] images of '[bold cyan]{keyword}[/bold cyan]'! Check the 'downloaded_images/{keyword}/' folder."
+                    success_msg = f"✅ Successfully downloaded [bold green]{count}[/bold green] images of '[bold cyan]{keyword}[/bold cyan]'! Check the 'downloaded_images/{keyword}/' folder."
+                    self.display_tool_result(tool, success_msg, success=True)
+                    return success_msg
                 else:
-                    return f"❌ Sorry, I couldn't download images of '{keyword}' right now."
+                    error_msg = f"❌ Sorry, I couldn't download images of '{keyword}' right now."
+                    self.display_tool_result(tool, error_msg, success=False)
+                    return error_msg
         
         except Exception as e:
-            return f"❌ Sorry, I'm currently unavailable for this request."
+            error_msg = f"❌ Sorry, I'm currently unavailable for this request."
+            self.display_tool_result(tool, error_msg, success=False)
+            return error_msg
     
     def generate_response(self, user_message, tool_result=None):
         """Step 2: Generate natural response, optionally including tool results"""
@@ -211,9 +318,9 @@ Chat examples:
             # Execute tool directly
             tool_result = self.execute_tool(analysis["tool"], analysis["params"])
             
-            # If tool_result is a Table (weather), display it directly
+            # If tool_result is a Table (weather), don't generate additional response
             if hasattr(tool_result, 'add_row'):
-                return tool_result
+                return "tool_executed"  # Special return to indicate tool was executed
             else:
                 response = self.generate_response(user_message, tool_result)
                 return response
@@ -266,7 +373,7 @@ Chat examples:
             if pending["tool"] == "weather":
                 # User provided city name
                 tool_result = self.execute_tool("weather", {"location": user_response})
-                return tool_result  # Return the table directly
+                return "tool_executed"  # Special return for weather table
             
             elif pending["tool"] == "images":
                 # This could be keyword or count - analyze the response
@@ -318,6 +425,10 @@ def display_user_message(message):
 
 def display_bot_response(response):
     """Display chatbot response with beautiful formatting"""
+    # Skip display if tool was executed (already displayed by tool result)
+    if response == "tool_executed":
+        return
+        
     # If response is a Table (weather), display it in a panel
     if hasattr(response, 'add_row'):
         console.print(Panel(response, title="🤖 Chatbot", title_align="left", 
