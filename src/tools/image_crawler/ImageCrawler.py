@@ -17,7 +17,7 @@ Copyright 2018 YoongiKim
 import os
 import requests
 import shutil
-from collect_links import CollectLinks
+from .collect_links import CollectLinks
 from PIL import Image
 import base64
 from pathlib import Path
